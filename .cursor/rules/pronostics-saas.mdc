@@ -1,0 +1,52 @@
+---
+description: Contexte projet SaaS Pronostics Football IA — règles strictes et orientation
+alwaysApply: true
+---
+
+# SaaS Pronostics Football IA
+
+Lire `INSTRUCTIONS.md` à la racine pour le contexte complet du projet.
+
+## Projet en bref
+
+SaaS de pronostics CDM assisté par IA (inspiration Visifoot) : analyse tactique + Value Bet + confiance IA.  
+Stack : Python, Pandas, Streamlit, `google.genai` (Gemini `gemini-2.5-flash`), api-sports.io v3.
+
+## Règles strictes (non négociables)
+
+### SDK IA
+```python
+# ❌ JAMAIS
+import google.generativeai as genai
+
+# ✅ TOUJOURS
+from google import genai
+client = genai.Client(api_key=...)
+client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+```
+
+### Chemins fichiers
+Toujours chemins **absolus** :
+`/Users/martinbrunet-lecomte/Downloads/matchs_cdm_2022.csv`
+
+### Prompt IA (5 sections Markdown FR)
+1. Compositions probables/officielles
+2. État de forme (sans matchs amicaux)
+3. Infirmerie
+4. Scénario tactique
+5. Verdict + confiance explicite ("L'IA est très confiante...")
+
+### UI Streamlit cible
+- `layout="wide"`, `st.columns([1,2,1])` face-à-face
+- `st.metric` pour cotes et confiance
+- Mode sombre, accents sportifs (vert `#00c853`)
+
+## Fichiers clés
+- `app.py` — UI Streamlit
+- `genere_prono.py` — test CLI IA
+- `debut.py` — collecte api-sports.io → CSV
+
+## Ne pas faire
+- Commits sans demande explicite
+- Clés API en clair dans nouveaux fichiers
+- Frameworks UI alternatifs sans décision
