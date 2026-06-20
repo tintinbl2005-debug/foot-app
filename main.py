@@ -3,7 +3,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 import pandas as pd
 import requests
@@ -34,13 +34,13 @@ api_sports_key = os.getenv("API_SPORTS_KEY")
 if not api_sports_key:
     print("⚠️ ALERTE : La clé API_SPORTS_KEY n'a pas été trouvée dans le .env !")
 
+# Nouvelle syntaxe Google GenAI
 if not cle_api:
     print("⚠️ ALERTE : La clé API GEMINI n'a pas été trouvée dans le fichier .env !")
+    gemini_client = None
 else:
-    print("✅ Clé API Gemini trouvée avec succès ! Initialisation du modèle...")
-    genai.configure(api_key=cle_api)
-
-model = genai.GenerativeModel('gemini-flash-latest')
+    print("✅ Clé API Gemini trouvée avec succès ! Initialisation du client...")
+    gemini_client = genai.Client(api_key=cle_api)
 
 # ==========================================
 # 2. FONCTIONS DE BASE DE DONNÉES (SUPABASE)
@@ -155,6 +155,12 @@ class MatchResponse(BaseModel):
 # ==========================================
 # 6. MOTEUR ALGORITHMIQUE
 # ==========================================
+def detect_gender(league_name: str) -> str:
+    women_keywords = ['women', 'féminin', 'feminin', 'frauen', 'mujeres', 'donna', 'femenino']
+    if any(keyword in league_name.lower() for keyword in women_keywords):
+        return "Équipe Féminine"
+    return "Équipe Masculine"
+
 def calculer_probabilites_1x2(lambda_dom: float, lambda_ext: float):
     prob_home = 0.0
     prob_draw = 0.0
@@ -241,14 +247,6 @@ def calculer_xg_dynamiques(match_id: int) -> tuple[float, float]:
         print(f"⚠️ Erreur xG dynamiques (match {match_id}): {e}")
     return lambda_home, lambda_away
 
-
-def detect_gender(league_name: str) -> str:
-    women_keywords = ['women', 'féminin', 'feminin', 'frauen', 'mujeres', 'donna', 'femenino']
-    if any(keyword in league_name.lower() for keyword in women_keywords):
-        return "Équipe Féminine"
-    return "Équipe Masculine"
-
-
 # ==========================================
 # 7. ROUTES DE L'API
 # ==========================================
@@ -302,12 +300,12 @@ async def get_single_match_with_analysis(match_id: int):
         logo_away = match_info['teams']['away']['logo']
         competition = match_info['league']['name']
         heure = match_info['fixture']['date'].split('T')[1][:5]
+        genre = detect_gender(competition)
 
-        request_data = MatchRequest(match_id=match_id,team_home=team_home, team_away=team_away)
+        request_data = MatchRequest(match_id=match_id, team_home=team_home, team_away=team_away)
         analyse = await analyze_match(request_data)
 
-        # On ajoute le genre au résultat renvoyé par l'IA
-        analyse.gender = genre # <--- NOUVELLE LIGNE
+        analyse.gender = genre
 
         resultat_final = analyse.dict()
         resultat_final.update({
@@ -317,7 +315,7 @@ async def get_single_match_with_analysis(match_id: int):
             "logo_away": logo_away,
             "competition": competition,
             "heure": heure,
-            "gender": genre # <--- NOUVELLE LIGNE (Assurance front)
+            "gender": genre
         })
 
         return resultat_final
@@ -347,34 +345,14 @@ async def analyze_match(request: MatchRequest):
                     "team": {"name": request.team_home},
                     "formation": "4-3-3",
                     "startXI": [
-                        {"player": {"name": "Gardien Dom", "number": 1, "grid": "1:1"}},
-                        {"player": {"name": "Def Gauche", "number": 3, "grid": "2:1"}},
-                        {"player": {"name": "Def Axe 1", "number": 4, "grid": "2:2"}},
-                        {"player": {"name": "Def Axe 2", "number": 5, "grid": "2:3"}},
-                        {"player": {"name": "Def Droit", "number": 2, "grid": "2:4"}},
-                        {"player": {"name": "Milieu 1", "number": 6, "grid": "3:1"}},
-                        {"player": {"name": "Milieu 2", "number": 8, "grid": "3:2"}},
-                        {"player": {"name": "Milieu 3", "number": 10, "grid": "3:3"}},
-                        {"player": {"name": "Att Gauche", "number": 11, "grid": "4:1"}},
-                        {"player": {"name": "Avant-Centre", "number": 9, "grid": "4:2"}},
-                        {"player": {"name": "Att Droit", "number": 7, "grid": "4:3"}}
+                        {"player": {"name": "Gardien", "number": 1, "grid": "1:1"}},
                     ]
                 },
                 {
                     "team": {"name": request.team_away},
                     "formation": "4-4-2",
                     "startXI": [
-                        {"player": {"name": "Gardien Ext", "number": 1, "grid": "1:1"}},
-                        {"player": {"name": "Lat Gauche", "number": 3, "grid": "2:1"}},
-                        {"player": {"name": "Central 1", "number": 4, "grid": "2:2"}},
-                        {"player": {"name": "Central 2", "number": 5, "grid": "2:3"}},
-                        {"player": {"name": "Lat Droit", "number": 2, "grid": "2:4"}},
-                        {"player": {"name": "Milieu G", "number": 11, "grid": "3:1"}},
-                        {"player": {"name": "Axial 1", "number": 6, "grid": "3:2"}},
-                        {"player": {"name": "Axial 2", "number": 8, "grid": "3:3"}},
-                        {"player": {"name": "Milieu D", "number": 7, "grid": "3:4"}},
-                        {"player": {"name": "Buteur 1", "number": 9, "grid": "4:1"}},
-                        {"player": {"name": "Buteur 2", "number": 10, "grid": "4:2"}}
+                        {"player": {"name": "Gardien", "number": 1, "grid": "1:1"}},
                     ]
                 }
             ]
@@ -389,8 +367,15 @@ async def analyze_match(request: MatchRequest):
     )
 
     try:
-        response = model.generate_content(prompt)
-        analyse_texte = response.text
+        if gemini_client:
+            # Nouvelle syntaxe pour la génération de contenu
+            response = gemini_client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=prompt
+            )
+            analyse_texte = response.text
+        else:
+            analyse_texte = "Erreur : Client IA non initialisé."
     except Exception as e:
         analyse_texte = "Indisponible."
 
@@ -422,6 +407,7 @@ async def analyze_match(request: MatchRequest):
 
     return MatchResponse(
         match_id=request.match_id,
+        gender="Non défini", # Sera écrasé par le route appelante
         prob_home=int(prob_h * 100),
         prob_draw=int(prob_d * 100),
         prob_away=int(prob_a * 100),
@@ -457,5 +443,5 @@ async def test_cloture(match_id: int, resultat_reel: str):
 # ==========================================
 if __name__ == "__main__":
     print("Démarrage du backend (FastAPI)...")
-    print("Accès à la documentation : http://127.0.0.1:8000/docs")
+    print("Accès à la documentation : https://foot-app-2.onrender.com/docs")
     uvicorn.run(app, host="127.0.0.1", port=8000)
