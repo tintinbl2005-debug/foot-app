@@ -17,7 +17,7 @@ function LandingPage() {
   const [searchError, setSearchError] = useState("");
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/api/matches/today")
+    fetch("hhttps://foot-app-2.onrender.com/api/matches/today")
       .then((res) => res.json())
       .then((data) => {
         setMatches(data);

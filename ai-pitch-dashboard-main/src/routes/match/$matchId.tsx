@@ -18,7 +18,7 @@ useEffect(() => {
   // Vérification basique de connexion (adapte selon ton système d'auth)
   const isConnected = localStorage.getItem("token") !== null; 
 
-  fetch(`http://127.0.0.1:8000/api/matches/${matchId}`, {
+  fetch(`https://foot-app-2.onrender.com/api/matches/${matchId}`, {
     headers: {
       "Authorization": isConnected ? `Bearer ${localStorage.getItem("token")}` : ""
     }
